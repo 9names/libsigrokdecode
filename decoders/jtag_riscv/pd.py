@@ -9,7 +9,7 @@ import sigrokdecode as srd
 ir = {
     '00000': ['BYPASS', 1], # Bypass register
     '00001': ['IDCODE', 32], # Bypass register
-    '10000': ['dtmscs', 35], # DTM Control and Status (dtmcs)
+    '10000': ['dtmcs', 35], # DTM Control and Status (dtmcs)
     '10001': ['dmi', 35],  #  Debug Module Interface Access (dmi)
     '10010': ['RESERVED', 35],  # Bypass register
     '10011': ['RESERVED', 35],  # Bypass register
@@ -148,6 +148,7 @@ class Decoder(srd.Decoder):
         self.state = 'IDLE'
         self.laststate = 'None'
         self.samplenums = None
+        self.instruction = None
 
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
@@ -227,7 +228,7 @@ class Decoder(srd.Decoder):
             else:
                 pass
 
-    def handle_reg_dtmscs(self, cmd, bits):
+    def handle_reg_dtmcs(self, cmd, bits):
         # Read only registers
         version = bits[-4:]
         abits = bits[-10:-4]
@@ -238,10 +239,20 @@ class Decoder(srd.Decoder):
         dmireset = bits[-17:-16]
         dmihardreset = bits[-18:-17]
         if cmd == 'IR TDO':
-            data_hex = '%s 0x%x' % (cmd, int('0b' + bits, 2))
+            # dmireset
+            # dmihardreset
+            # data_hex = '%s 0x%x' % (cmd, int('0b' + bits, 2))
+            data_hex = 'dmireset = %s, dmihardreset = %s' % (dmireset, dmihardreset)
             self.putx([2, [data_hex]])        
         elif cmd == 'IR TDI':
-            data_hex = '%s 0x%x' % (cmd, int('0b' + bits, 2))
+            # version = bits[-4:]
+            # abits = bits[-10:-4]
+            # dmistat = bits[-12:-10]
+            # idle = bits[-15:-12]
+            # zero = bits[-16:-15]
+            # data_hex = '%s 0x%x' % (cmd, int('0b' + bits, 2))
+            data_hex = 'version = %s, abits = %s, dmistat = %s, idle = %s' % \
+                (version, abits, dmistat, idle)
             self.putx([1, [data_hex]])  
         else:
             pass
@@ -282,8 +293,9 @@ class Decoder(srd.Decoder):
             self.samplenums.reverse()
 
         if cmd == 'IR TDI':
-            self.state = ir.get(val[:5], ['UNKNOWN', 0])[0]
-            self.putx([5, ['State after IR TDI = : %s' % self.state]])
+            # self.state = ir.get(val[:5], ['UNKNOWN', 0])[0]
+            # self.putx([5, ['State after IR TDI = : %s' % self.state]])
+            self.instruction = ir.get(val[:5], ['UNKNOWN', 0])[0]
 
         if cmd == 'NEW STATE':
             if val == 'TEST-LOGIC-RESET':
@@ -319,7 +331,7 @@ class Decoder(srd.Decoder):
             handle_reg(cmd, val)
             if cmd == 'DR TDO': # Assumes 'DR TDI' comes before 'DR TDO'.
                 self.state = 'IDLE'
-        elif self.state in ('dtmscs', 'dmi'):
+        elif self.state in ('dtmcs', 'dmi'):
              # Here we're interested in incoming and outgoing bits (TDI/TDO).
             # if cmd not in ('DR TDI', 'DR TDO'):
             #     return
